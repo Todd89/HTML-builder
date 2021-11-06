@@ -22,7 +22,6 @@ function copyFile() {
 function copyDir() {
 
   let pathOfTarget = path.join(__dirname) + "/files-copy";
-  let pathOfSource = path.join(__dirname) + "/files";
 
   fs.stat(`${pathOfTarget}`, function (err) {
     if(!err) {

@@ -15,11 +15,13 @@ function addBundle() {
           let info = el.name.split(".")
           if(info[1] === "css") {
 
-            let fileContent = fs.readFileSync(`${pathOfSource}/${el.name}`, "utf8");
-
-            fs.appendFile(pathOfTarget, `${fileContent}`, function (error) {
-              if(error) throw error 
-            })
+            fs.readFile(`${pathOfSource}/${el.name}`, "utf8", (err, fileContent) => {
+              if(!err) {
+                fs.appendFile(pathOfTarget, `${fileContent}`, function (error) {
+                  if(error) throw error
+                })
+              }
+            });
           }
         }
       })
