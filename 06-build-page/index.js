@@ -1,138 +1,119 @@
-const fs = require('fs');
-const path = require('path');
+const { join, extname } = require('path');
+const { readdir, mkdir, copyFile, rm  } = require('fs/promises');
+const { createWriteStream, createReadStream } = require('fs');
 
 
-async function buildHtml() {
+const makePage = async () => {
 
-  // Copy asset
+  const folder = join(__dirname, 'project-dist'); 
+  const change = /{{[a-z]+}}/g;
 
-  function copyAsset() {
+const clear = async (clear) => {
 
-    let pathOfSource = path.join(__dirname, "assets");
-    let pathOfTarget = path.join(__dirname, "project-dist");
+  await rm(clear, {recursive: true, force: true});
+  await mkdir(clear, { recursive: true });
 
-    fs.readdir(pathOfSource, { withFileTypes: true }, (err, folders) => {
-
-      if(err) {
-        return console.error(err);
-      }
-
-      folders.map(folder => {
-        if(!folder.isFile()) {
-
-          fs.mkdir(`${pathOfTarget}/assets/${folder.name}`, { recursive: true }, (err) => {
-            if(err) {
-              console.log("Error Found:", err);
-            }
-          })
-
-          fs.readdir(`${pathOfSource}/${folder.name}`, { withFileTypes: true }, (err, files) => {
-            if(err) {
-              console.log("Error Found:", err);
-            }
-            files.map(file => {
-
-              fs.copyFile(`${pathOfSource}/${folder.name}/${file.name}`, `${pathOfTarget}/assets/${folder.name}/${file.name}`, (err) => {
-                if(err) {
-                  console.log("Error Found:", err);
-                }
-              })
-            })
-          })
-        }
-      })
-    })
-  }
-
-  let pathOfTarget = path.join(__dirname, "project-dist/assets");
-
-  await fs.promises.rm(path.join(__dirname, 'project-dist'), { recursive: true, force: true })
-  await fs.promises.mkdir(pathOfTarget, { recursive: true })
-
-  copyAsset()
-
-  // Make styles
-
-  let pathOfSourceS = path.join(__dirname, "styles");
-  let pathOfTargetS = path.join(__dirname, "project-dist", "style.css");
-
-  fs.stat(path.join(__dirname, "project-dist", "style.css"), err => {
-    if(!err) {
-      fs.unlink(path.join(__dirname, "project-dist", "style.css"), err => {
-        if(err) {
-          console.log(err);
-        }
-      });
-    } else {
-      fs.readdir(pathOfSourceS, { withFileTypes: true }, (err, files) => {
-        if(err) {
-          return console.error(err);
-        } else {
-          files.map(el => {
-            if(el.isFile() === true) {
-              let info = el.name.split(".")
-              if(info[1] === "css") {
-
-                fs.readFile(`${pathOfSourceS}/${el.name}`, "utf8", (err, style) => {
-                  fs.appendFile(pathOfTargetS, `${style}`, function (error) {
-                    if(error) throw error
-                  })
-                });
-              }
-            }
-          })
-        }
-      })
-    }
-    fs.readdir(pathOfSourceS, { withFileTypes: true }, (err, files) => {
-      if(err) {
-        return console.error(err);
-      } else {
-        files.map(el => {
-          if(el.isFile() === true) {
-            let info = el.name.split(".")
-            if(info[1] === "css") {
-
-              fs.readFile(`${pathOfSourceS}/${el.name}`, "utf8", (err, style) => {
-                fs.appendFile(pathOfTargetS, `${style}`, function (error) {
-                  if(error) throw error
-                })
-              });
-            }
-          }
-        })
-      }
-    })
-  })
-
-  // Build HTML 
-
-
-  let readableStream = fs.createReadStream(
-    path.join(__dirname, 'template.html'),
-    'utf8'
-  )
-  
-  let writeableStream = fs.createWriteStream(path.join(__dirname, 'project-dist', 'index.html'))
-  
-  readableStream.pipe(writeableStream)
-
-
-  let fileIndex = await fs.promises.readFile(path.join(__dirname, 'project-dist', 'index.html'), 'utf8'); 
-  const change = fileIndex.match(/{{[a-z]+}}/g);
-
-  for (el of change) {
-    const name = el.slice(2,-2);
-    const newContent = await fs.promises.readFile(path.join(__dirname, 'components', `${name}.html`), 'utf8'); 
-    const curfileIndex = await fs.promises.readFile(path.resolve(__dirname, 'project-dist', 'index.html'), 'utf8');
-    let newfileIndex = curfileIndex.replace(el, newContent);
-    await fs.promises.writeFile(path.resolve(__dirname, 'project-dist', 'index.html'), newfileIndex);
-  }
 }
 
-buildHtml()
+const files = async (item1_1, item1_2, writeStream) => {
+  const one = join(item1_1, item1_2);
+  const files = await readdir(one, { withFileTypes: true });
 
+  for (const file of files) {
 
+    if (file.isFile()) {
+      const type = extname(file.name);
+      const oldFile = join(one, file.name);
+
+      if (type === '.css') {
+
+        const readableStream = createReadStream(oldFile, 'utf-8');
+        readableStream.on('data', (chunk) => writeStream.write(chunk));
+      }
+    } else files(one, file.name);
+  }
+};
+
+const makeContent = async (folder, name) => {
+
+  const fileBundel = join(folder, name); 
+  const writeStream = createWriteStream(fileBundel, 'utf-8');
+  files(__dirname, 'styles', writeStream);
+  
+}
+
+const makeAssets = async (item1_1,item1_2, item2_1, item2_2) => {
+
+  const one = join(item1_1, item1_2);
+  const two = join(item2_1,item2_2);
+  await clear(two);
+
+  const files = await readdir(one, { withFileTypes: true });
+
+  for (const file of files) {
+
+    if (file.isFile()) {
+      const oldFile = join(one, file.name);
+      const newFile = join(two, file.name);
+      await copyFile(oldFile, newFile);
+    } else makeAssets(one, file.name, two, file.name);
+  }
+};
+
+const write = (text) => {
+
+  const linkResult = join(folder, 'index.html');
+  const writeStream = createWriteStream(linkResult, 'utf-8');
+  writeStream.write(text);
+  writeStream.end();
+
+}
+
+const comp = (item) => {
+
+  let nameFile = item.replace('{{', '');
+  nameFile = nameFile.replace('}}', '');
+  const linkFile = join(__dirname, 'components', `${nameFile}.html`);
+  const readableStream = createReadStream(linkFile, 'utf8');
+
+  return readableStream;
+
+}
+
+const HTMLread = () => {
+
+  const linkFile = join(__dirname, 'template.html');
+  const readableStream = createReadStream(linkFile, 'utf8');
+  let arr = [];
+  let textHTML = '';
+
+  readableStream.on('data', (chunk) => {
+    arr = chunk.match(change); 
+    textHTML = chunk;
+  });
+
+  readableStream.on('end', () => {
+    arr.forEach((item, i) => {
+      const steam = comp(item);
+      steam.on('data', (chunk) => {
+        textHTML = textHTML.replace(item, chunk);
+      });
+      steam.on('end', () => {
+        if (i === arr.length - 1) write(textHTML);
+      });
+    });
+  });
+
+}
+
+  await clear(folder);
+  HTMLread();
+  await makeAssets(__dirname, 'assets', folder, 'assets');
+  await makeContent(folder, 'style.css');
+ 
+}
+
+makePage();
 
 
 
